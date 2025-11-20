@@ -67,7 +67,14 @@ if API_KEY:
 app = Flask(__name__)
 CORS(
     app,
-    resources={r"/api/*": {"origins": ["http://localhost:5173"]}},
+    resources={
+        r"/api/*": {
+            "origins": [
+                "http://localhost:5173",
+                "http://localhost:4173",
+            ]
+        }
+    },
     supports_credentials=True,
     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
