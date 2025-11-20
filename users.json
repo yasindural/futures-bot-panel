@@ -1,0 +1,10 @@
+[
+  {
+    "username": "admin",
+    "password_hash": "scrypt:32768:8:1$ZxorgyvWyzkSQYJW$4b76be2c6a48beed26a8aa226f0bc427b84aa2624331b51117180387ba8b82ccf949cd546de779cacebac75306290485643856ecf2d6e72954827de50f270677",
+    "role": "admin",
+    "api_key": "",
+    "api_secret": "",
+    "theme_preference": "dark"
+  }
+]

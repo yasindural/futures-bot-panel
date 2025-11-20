@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="tr" x-data="appState()" x-init="init()">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Futures Bot Paneli</title>
+    <!-- Tailwind base before custom CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" />
+    <!-- Custom Bybit style -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}" />
+    <!-- Alpine & Chart -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <!-- App logic -->
+    <script defer src="{{ url_for('static', filename='js/app.js') }}"></script>
+</head>
+<body class="app-body">
+    <!-- Auth Screen -->
+    <div x-show="showLogin" class="auth-screen">
+        <div class="auth-card">
+            <div class="auth-glow"></div>
+            <div class="auth-content">
+                <span class="hero-pill">Futures Bot</span>
+                <h1>Kontrol Merkezine Hoş Geldin</h1>
+                <p>Premium Bybit tarzı panel için kimlik doğrulaması gerekiyor.</p>
+                <form @submit.prevent="handleLogin" class="auth-form">
+                    <label>
+                        Kullanıcı Adı
+                        <input type="text" x-model="loginForm.username" placeholder="admin" required />
+                    </label>
+                    <label>
+                        Şifre
+                        <input type="password" x-model="loginForm.password" placeholder="••••••••" required />
+                    </label>
+                    <button type="submit" class="btn-gold">Giriş Yap</button>
+                    <p x-show="loginError" class="auth-error" x-text="loginError"></p>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- App Shell -->
+    <div x-show="!showLogin" class="app-shell">
+        <!-- Navbar -->
+        <nav class="primary-nav">
+            <div class="nav-left">
+                <span class="logo-dot"></span>
+                <div>
+                    <p class="logo-title">Futures Bot</p>
+                    <p class="logo-sub">Canlı Risk Merkezi</p>
+                </div>
+            </div>
+            <div class="nav-tabs">
+                <button @click="currentTab = 'dashboard'" :class="currentTab === 'dashboard' ? 'tab-active' : ''">Genel Bakış</button>
+                <button @click="currentTab = 'trade'" :class="currentTab === 'trade' ? 'tab-active' : ''">İşlem Paneli</button>
+                <button @click="currentTab = 'risk'" :class="currentTab === 'risk' ? 'tab-active' : ''">Risk & PnL</button>
+                <button @click="currentTab = 'simulation'" :class="currentTab === 'simulation' ? 'tab-active' : ''">Simülasyon</button>
+                <button @click="currentTab = 'strategy'" :class="currentTab === 'strategy' ? 'tab-active' : ''">Strateji</button>
+                <template x-if="user?.role === 'admin'">
+                    <button @click="currentTab = 'users'" :class="currentTab === 'users' ? 'tab-active' : ''">Kullanıcılar</button>
+                </template>
+                <button @click="currentTab = 'settings'" :class="currentTab === 'settings' ? 'tab-active' : ''">Ayarlar</button>
+                <button @click="currentTab = 'logs'" :class="currentTab === 'logs' ? 'tab-active' : ''">Kayıtlar</button>
+            </div>
+            <div class="nav-actions">
+                <div class="search-box">
+                    <input type="text" x-model="globalSearch" placeholder="Arama..." />
+                    <span>⌕</span>
+                </div>
+                <span x-show="testMode" class="badge badge-gold">TEST</span>
+                <button class="icon-button" @click="toggleTheme()" :title="isDarkMode ? 'Açık Tema' : 'Koyu Tema'">
+                    <span x-text="isDarkMode ? '☀️' : '🌙'"></span>
+                </button>
+                <button class="icon-button" @click="showNotifications = !showNotifications">
+                    🔔
+                    <span x-show="notifications.length" class="notif-dot"></span>
+                </button>
+                <div class="user-menu" x-data="{ open: false }">
+                    <button @click="open = !open">
+                        <span x-text="user?.username"></span>
+                        <small x-text="user?.role"></small>
+                        <svg width="10" height="6"><path d="M0 0l5 6 5-6" fill="#F3BA2F" /></svg>
+                    </button>
+                    <div class="user-dropdown" x-show="open" @click.away="open = false">
+                        <button @click="handleLogout()">Çıkış Yap</button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Notification Center -->
+        <div x-show="showNotifications" class="notification-center" @click.away="showNotifications = false">
+            <div class="notification-head">
+                <h3>Bildirim Merkezi</h3>
+                <span x-text="notifications.length + ' kayıt'"></span>
+            </div>
+            <div class="notification-body">
+                <template x-if="!notifications.length">
+                    <p class="empty-state">Yeni bildirim yok</p>
+                </template>
+                <template x-for="notif in notifications" :key="notif.id">
+                    <div class="notification-item">
+                        <div>
+                            <p x-text="notif.message"></p>
+                            <small x-text="notif.time"></small>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Toasts -->
+        <div class="toast-stack" x-show="toasts.length">
+            <template x-for="toast in toasts" :key="toast.id">
+                <div class="toast" :class="toast.type === 'success' ? 'toast-success' : toast.type === 'error' ? 'toast-error' : ''">
+                    <span x-text="toast.message"></span>
+                    <button @click="removeToast(toast.id)">×</button>
+                </div>
+            </template>
+        </div>
+
+        <!-- Main -->
+        <main class="app-main">
+            <!-- Dashboard -->
+            <section x-show="currentTab === 'dashboard'" class="space-y-8">
+                <div class="hero-panel">
+                    <div class="hero-bg"></div>
+                    <div class="hero-info">
+                        <p class="hero-pill">Anlık Gözetim</p>
+                        <h1>Futures Bot Komuta Merkezi</h1>
+                        <p>
+                            PnL trendlerini, strateji sinyallerini ve risk parametrelerini Bybit’den ilham alan premium yüzeyde takip et.
+                        </p>
+                        <div class="hero-actions">
+                            <button class="btn-gold" @click="currentTab = 'trade'">İşlem Paneli</button>
+                            <button class="btn-outline" @click="currentTab = 'strategy'">Webhook Testi</button>
+                        </div>
+                    </div>
+                    <div class="hero-cards">
+                        <div>
+                            <p>Bot Versiyon</p>
+                            <h3 x-text="botVersion || '-'">PNL_TRAIL_V2</h3>
+                        </div>
+                        <div>
+                            <p>Aktif Watcher</p>
+                            <h3 x-text="activeWatchers">0</h3>
+                        </div>
+                        <div>
+                            <p>Durum</p>
+                            <span class="status-chip success">Çalışıyor</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="summary-grid">
+                    <article class="summary-card">
+                        <p>Günlük Realized PnL</p>
+                        <h2 :class="pnlSummary.daily_realized_pnl >= 0 ? 'text-green' : 'text-red'" x-text="formatNumber(pnlSummary.daily_realized_pnl) + ' USDT'"></h2>
+                        <small>Bugün</small>
+                    </article>
+                    <article class="summary-card">
+                        <p>Toplam Realized PnL</p>
+                        <h2 :class="pnlSummary.total_realized_pnl >= 0 ? 'text-green' : 'text-red'" x-text="formatNumber(pnlSummary.total_realized_pnl) + ' USDT'"></h2>
+                        <small>Tüm zamanlar</small>
+                    </article>
+                    <article class="summary-card">
+                        <p>Genel ROI % (Kâr)</p>
+                        <h2 :class="pnlSummary.overall_roi >= 0 ? 'text-green' : 'text-red'" x-text="formatNumber(pnlSummary.overall_roi, 2) + ' %'"></h2>
+                        <small>Yatırım getiri oranı</small>
+                    </article>
+                    <article class="summary-card danger">
+                        <p>Günlük Max Zarar</p>
+                        <h2 class="text-red" x-text="formatNumber(config.BOT_DAILY_MAX_LOSS) + ' USDT'"></h2>
+                        <small>Günlük zarar limiti</small>
+                    </article>
+                </div>
+
+                <div class="btc-card">
+                    <header>
+                        <div>
+                            <p class="label">BTC Long Durum Özeti</p>
+                            <h3>Trend ve güven skorunu tek bakışta izle</h3>
+                        </div>
+                        <span class="badge badge-gold" x-text="btcStrategy?.symbol || 'BTCUSDT'"></span>
+                    </header>
+                    <div class="btc-grid" x-show="btcStrategy">
+                        <div>
+                            <span>Trend</span>
+                            <p><span class="status-chip" :class="btcStrategy?.long_trend ? 'success' : 'danger'" x-text="btcStrategy?.long_trend ? 'LONG' : 'SHORT'"></span></p>
+                        </div>
+                        <div>
+                            <span>Son Long Başlangıç</span>
+                            <p x-text="formatNumber(btcStrategy?.last_long_start_price || 0)"></p>
+                        </div>
+                        <div>
+                            <span>Mevcut Fiyat</span>
+                            <p class="text-gold" x-text="formatNumber(btcStrategy?.current_price || 0)"></p>
+                        </div>
+                        <div>
+                            <span>Breakout Fiyatı</span>
+                            <p x-text="formatNumber(btcStrategy?.breakout_price || 0)"></p>
+                        </div>
+                        <div>
+                            <span>Güven Skoru</span>
+                            <p class="text-gold" x-text="(btcStrategy?.confidence_score || 0) + ' %'"></p>
+                        </div>
+                    </div>
+                    <div x-show="!btcStrategy" class="empty-state">Veri yükleniyor...</div>
+                </div>
+            </section>
+
+            <!-- Trade Panel -->
+            <section x-show="currentTab === 'trade'" class="space-y-6">
+                <div class="section-head">
+                    <div>
+                        <p class="label">Pozisyon Akışı</p>
+                        <h2>İşlem Paneli</h2>
+                    </div>
+                    <div class="head-actions">
+                        <label class="toggle">
+                            <input type="checkbox" x-model="autoRefresh" />
+                            <span>Otomatik Yenile</span>
+                        </label>
+                        <button class="btn-gold" @click="exportPositionsCSV()">CSV İndir</button>
+                    </div>
+                </div>
+                <div class="filter-row">
+                    <button @click="positionFilter = 'all'" :class="positionFilter === 'all' ? 'filter-active' : ''">Tümü</button>
+                    <button @click="positionFilter = 'long'" :class="positionFilter === 'long' ? 'filter-active success' : ''">LONG</button>
+                    <button @click="positionFilter = 'short'" :class="positionFilter === 'short' ? 'filter-active danger' : ''">SHORT</button>
+                    <button @click="positionFilter = 'profit'" :class="positionFilter === 'profit' ? 'filter-active success' : ''">Kazançta</button>
+                    <button @click="positionFilter = 'loss'" :class="positionFilter === 'loss' ? 'filter-active danger' : ''">Zararda</button>
+                </div>
+                <div class="position-grid">
+                    <template x-for="pos in filteredPositions" :key="pos.state_key">
+                        <article class="position-card" :class="pos.position_side === 'LONG' ? 'long' : 'short'">
+                            <header>
+                                <div>
+                                    <h3 x-text="pos.symbol"></h3>
+                                    <span class="badge" :class="pos.position_side === 'LONG' ? 'badge-green' : 'badge-red'" x-text="pos.position_side"></span>
+                                </div>
+                            </header>
+                            <dl>
+                                <div><dt>Giriş</dt><dd x-text="formatNumber(pos.entry)"></dd></div>
+                                <div><dt>Miktar</dt><dd x-text="formatNumber(pos.qty)"></dd></div>
+                                <div><dt>SL Fiyatı</dt><dd x-text="formatNumber(pos.sl)"></dd></div>
+                                <div><dt>SL ROE</dt><dd x-text="formatNumber(pos.sl_roe, 1) + ' %'"></dd></div>
+                                <div><dt>Peak ROE</dt><dd :class="pos.peak_roe >= 0 ? 'text-green' : 'text-red'" x-text="formatNumber(pos.peak_roe, 1) + ' %'"></dd></div>
+                                <div><dt>Peak PnL</dt><dd :class="pos.peak_pnl >= 0 ? 'text-green' : 'text-red'" x-text="formatNumber(pos.peak_pnl) + ' USDT'"></dd></div>
+                                <div><dt>Kaldıraç</dt><dd x-text="pos.leverage + 'x'"></dd></div>
+                                <div><dt>Açılış</dt><dd x-text="formatDate(pos.opened_at)"></dd></div>
+                            </dl>
+                            <footer>
+                                <button class="btn-danger" @click="closePosition(pos.state_key)">Pozisyonu Kapat</button>
+                                <button class="btn-outline" @click="showPositionDetail(pos)">Detay</button>
+                            </footer>
+                        </article>
+                    </template>
+                </div>
+                <div class="empty-state" x-show="filteredPositions.length === 0">Şu anda açık pozisyon yok.</div>
+            </section>
+
+            <!-- Risk -->
+            <section x-show="currentTab === 'risk'" class="space-y-6">
+                <div class="section-head"><div><p class="label">PnL Grafikleri</p><h2>Risk & PnL Analizi</h2></div></div>
+                <div class="chart-grid">
+                    <div class="card"><h3>7 Günlük PnL</h3><div class="chart-container"><canvas id="chart-7d"></canvas></div></div>
+                    <div class="card"><h3>30 Günlük PnL</h3><div class="chart-container"><canvas id="chart-30d"></canvas></div></div>
+                </div>
+            </section>
+
+            <!-- Simulation -->
+            <section x-show="currentTab === 'simulation'" class="space-y-6">
+                <div class="section-head"><div><p class="label">ROI Motoru</p><h2>Simülasyon & Backtest</h2></div></div>
+                <div class="grid-two">
+                    <div class="card">
+                        <form @submit.prevent="runSimulation()" class="sim-form">
+                            <label>Giriş Fiyatı<input type="number" step="0.01" x-model="simForm.entry_price" required /></label>
+                            <label>Yön<select x-model="simForm.direction" class="select-dark" required><option value="LONG">LONG</option><option value="SHORT">SHORT</option></select></label>
+                            <label>Margin (USDT)<input type="number" step="0.01" x-model="simForm.margin" required /></label>
+                            <label>Kaldıraç<input type="number" x-model="simForm.leverage" required /></label>
+                            <label class="full">Fiyat Listesi<textarea rows="4" x-model="simForm.prices" required placeholder="68000, 68200, 68500, 69000"></textarea></label>
+                            <div class="sim-actions">
+                                <button type="submit" class="btn-gold">Simülasyonu Çalıştır</button>
+                                <button type="button" class="btn-outline" @click="loadExampleScenario()">Örnek Senaryo</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="card"><h3>Simülasyon Grafiği</h3><div class="chart-container"><canvas id="sim-chart"></canvas></div></div>
+                </div>
+                <div class="card" x-show="simResults.length">
+                    <h3>Sonuçlar</h3>
+                    <table class="table-dark">
+                        <thead><tr><th>Adım</th><th>Fiyat</th><th>PnL</th><th>ROE %</th><th>Peak ROE %</th><th>SL ROE %</th><th>SL Fiyatı</th><th>Not</th></tr></thead>
+                        <tbody>
+                            <template x-for="row in simResults" :key="row.step">
+                                <tr>
+                                    <td x-text="row.step"></td>
+                                    <td x-text="formatNumber(row.price)"></td>
+                                    <td :class="row.pnl >= 0 ? 'text-green' : 'text-red'" x-text="formatNumber(row.pnl)"></td>
+                                    <td :class="row.roe >= 0 ? 'text-green' : 'text-red'" x-text="formatNumber(row.roe, 1) + ' %'"></td>
+                                    <td :class="row.peak_roe >= 0 ? 'text-green' : 'text-red'" x-text="formatNumber(row.peak_roe, 1) + ' %'"></td>
+                                    <td x-text="formatNumber(row.sl_roe, 1) + ' %'"></td>
+                                    <td x-text="formatNumber(row.sl_price)"></td>
+                                    <td class="text-tertiary" x-text="row.note"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Strategy -->
+            <section x-show="currentTab === 'strategy'" class="space-y-6">
+                <div class="section-head"><div><p class="label">Webhook Terminali</p><h2>Strateji & Webhook</h2></div></div>
+                <div class="card">
+                    <div class="webhook-row">
+                        <div><p>Webhook URL</p><small>TradingView alarm’larını buraya gönder.</small></div>
+                        <div class="webhook-input"><input type="text" :value="webhookUrl" readonly /><button class="btn-gold" @click="copyWebhookUrl()">Kopyala</button></div>
+                    </div>
+                    <div class="payload-box"><h4>Örnek Payload</h4><pre><code>{\n  \"ticker\": \"BTCUSDT\",\n  \"dir\": \"LONG\",\n  \"entry\": 68000\n}</code></pre></div>
+                    <form @submit.prevent="testWebhook()" class="webhook-form">
+                        <label>Sembol<input type="text" x-model="webhookTest.ticker" placeholder="BTCUSDT" required /></label>
+                        <label>Yön<select x-model="webhookTest.dir" class="select-dark" required><option value="LONG">LONG</option><option value="SHORT">SHORT</option></select></label>
+                        <label>Giriş Fiyatı<input type="number" step="0.01" x-model="webhookTest.entry" placeholder="68000" required /></label>
+                        <button type="submit" class="btn-gold">Test Gönder</button>
+                    </form>
+                    <div class="payload-result" x-show="webhookTestResult"><pre x-text="JSON.stringify(webhookTestResult, null, 2)"></pre></div>
+                </div>
+            </section>
+
+            <!-- Users -->
+            <section x-show="currentTab === 'users' && user?.role === 'admin'" class="space-y-6">
+                <div class="section-head"><div><p class="label">Yönetici Modu</p><h2>Kullanıcılar</h2></div><button class="btn-gold" @click="showAddUserModal = true">Yeni Kullanıcı</button></div>
+                <div class="card overflow-x-auto">
+                    <table class="table-dark">
+                        <thead><tr><th>Kullanıcı</th><th>Rol</th><th>API Key</th><th>İşlemler</th></tr></thead>
+                        <tbody>
+                            <template x-for="u in users" :key="u.username">
+                                <tr>
+                                    <td x-text="u.username"></td>
+                                    <td><span class="badge" :class="u.role === 'admin' ? 'badge-gold' : 'badge-gray'" x-text="u.role"></span></td>
+                                    <td class="text-tertiary" x-text="u.api_key"></td>
+                                    <td>
+                                        <div class="table-actions">
+                                            <button class="btn-outline" @click="resetUserPassword(u.username)">Şifre Sıfırla</button>
+                                            <button class="btn-danger" @click="deleteUser(u.username)">Sil</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Settings -->
+            <section x-show="currentTab === 'settings'" class="space-y-6">
+                <div class="section-head"><div><p class="label">Konfigürasyon</p><h2>Bot Ayarları</h2></div></div>
+                <div class="card">
+                    <form @submit.prevent="saveConfig()" class="settings-grid">
+                        <label>Margin (USDT)<input type="number" step="0.01" x-model="config.BOT_MARGIN_USDT" required /></label>
+                        <label>Kaldıraç<input type="number" x-model="config.BOT_LEVERAGE" required /></label>
+                        <label>Günlük Max Zarar<input type="number" step="0.01" x-model="config.BOT_DAILY_MAX_LOSS" required /></label>
+                        <label>Başlangıç SL ROE<input type="number" step="0.1" x-model="config.BOT_INITIAL_SL_ROE" required /></label>
+                        <label>Watcher Süresi<input type="number" step="0.1" x-model="config.BOT_WATCH_INTERVAL_SECONDS" required /></label>
+                        <label>Auto Logout<input type="number" x-model="config.AUTO_LOGOUT_MINUTES" required /></label>
+                        <div class="toggle-col">
+                            <label class="toggle"><input type="checkbox" x-model="config.USE_DYNAMIC_PRECISION" /><span>Dinamik Precision</span></label>
+                            <label class="toggle"><input type="checkbox" x-model="config.TEST_MODE" /><span>Test Modu</span></label>
+                        </div>
+                        <div class="settings-actions">
+                            <button type="submit" class="btn-gold">Kaydet</button>
+                            <button type="button" class="btn-outline" @click="resetConfig()">Varsayılanlara Dön</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Logs -->
+            <section x-show="currentTab === 'logs'" class="space-y-6">
+                <div class="section-head">
+                    <div><p class="label">Denetim Günlüğü</p><h2>Kayıtlar</h2></div>
+                    <div class="head-actions">
+                        <input type="text" class="input-dark" placeholder="Filtrele" x-model="logFilter" />
+                        <button class="btn-gold" @click="refreshLogs()">Yenile</button>
+                    </div>
+                </div>
+                <div class="card log-panel">
+                    <pre>
+                        <template x-for="log in filteredLogs" :key="log">
+                            <div x-text="log"></div>
+                        </template>
+                    </pre>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Add User Modal -->
+    <div x-show="showAddUserModal" class="modal" @click.away="showAddUserModal = false">
+        <div class="modal-card">
+            <div class="modal-head"><h3>Yeni Kullanıcı</h3></div>
+            <form @submit.prevent="addUser()" class="modal-body">
+                <label>Kullanıcı Adı<input type="text" x-model="newUser.username" required /></label>
+                <label>Şifre<input type="password" x-model="newUser.password" required /></label>
+                <label>Rol<select x-model="newUser.role" class="select-dark" required><option value="trader">Trader</option><option value="admin">Admin</option></select></label>
+                <label>API Key<input type="text" x-model="newUser.api_key" /></label>
+                <label>API Secret<input type="password" x-model="newUser.api_secret" /></label>
+                <div class="modal-actions">
+                    <button type="submit" class="btn-gold">Ekle</button>
+                    <button type="button" class="btn-outline" @click="showAddUserModal = false">İptal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Position Detail Modal -->
+    <div x-show="showPositionDetailModal" class="modal" @click.away="showPositionDetailModal = false">
+        <div class="modal-card">
+            <div class="modal-head"><h3>Pozisyon Detayı</h3></div>
+            <div class="modal-body" x-show="selectedPosition">
+                <div class="detail-grid">
+                    <div><span>Sembol</span><p x-text="selectedPosition?.symbol"></p></div>
+                    <div><span>Yön</span><p x-text="selectedPosition?.position_side"></p></div>
+                    <div><span>Giriş</span><p x-text="formatNumber(selectedPosition?.entry)"></p></div>
+                    <div><span>Miktar</span><p x-text="formatNumber(selectedPosition?.qty)"></p></div>
+                    <div><span>SL Fiyatı</span><p x-text="formatNumber(selectedPosition?.sl)"></p></div>
+                    <div><span>SL ROE</span><p x-text="formatNumber(selectedPosition?.sl_roe, 1) + ' %'"></p></div>
+                </div>
+            </div>
+            <div class="modal-actions"><button class="btn-outline" @click="showPositionDetailModal = false">Kapat</button></div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
+{
+  "cells": [],
+  "metadata": {
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 2
+}

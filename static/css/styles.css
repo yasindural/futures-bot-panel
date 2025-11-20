@@ -1,0 +1,272 @@
+:root {
+    color-scheme: dark;
+    --bg-dark: #0b1120;
+    --bg-card: #111b2d;
+    --bg-panel: #0f172a;
+    --border: rgba(255, 255, 255, 0.08);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --accent: #10b981;
+    --accent-strong: #f59e0b;
+}
+
+body[data-theme="light"] {
+    color-scheme: light;
+    --bg-dark: #f4f5f7;
+    --bg-card: #ffffff;
+    --bg-panel: #ffffff;
+    --border: rgba(15, 23, 42, 0.1);
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --accent: #059669;
+    --accent-strong: #b45309;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg-dark);
+    font-family: "Inter", "Segoe UI", sans-serif;
+    color: var(--text-primary);
+}
+
+.page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 16px 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.top-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: center;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+}
+
+.branding h1 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.subtitle {
+    margin: 4px 0 0;
+    color: var(--text-secondary);
+}
+
+.badge {
+    display: inline-flex;
+    padding: 6px 16px;
+    border-radius: 999px;
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.top-actions {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.health-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+}
+
+.dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
+}
+
+.theme-toggle {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-primary);
+    padding: 8px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.panel.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+}
+
+.panel-header h2 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.panel-header p {
+    margin: 4px 0 0;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+}
+
+.card {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    background: var(--bg-card);
+}
+
+.card h3 {
+    margin: 4px 0 0;
+    font-size: 1.4rem;
+}
+
+.card p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 600px;
+}
+
+th,
+td {
+    text-align: left;
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.95rem;
+}
+
+th {
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.empty-state {
+    padding: 16px;
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.4);
+    color: var(--text-secondary);
+}
+
+.hidden {
+    display: none !important;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.form-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.form-grid input,
+.form-grid select,
+.form-grid textarea {
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    padding: 10px 12px;
+    font-size: 0.95rem;
+    font-family: inherit;
+}
+
+.form-grid textarea {
+    resize: vertical;
+}
+
+.form-grid .primary {
+    grid-column: 1 / -1;
+    justify-self: start;
+}
+
+.form-grid .full-width {
+    grid-column: 1 / -1;
+}
+
+button.primary {
+    background: var(--accent);
+    color: #0f172a;
+    border: none;
+    padding: 12px 18px;
+    border-radius: 999px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.code-block {
+    background: #020617;
+    border-radius: 12px;
+    padding: 16px;
+    min-height: 120px;
+    border: 1px solid var(--border);
+    overflow: auto;
+    font-size: 0.9rem;
+}
+
+.chart-wrapper {
+    margin-top: 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    background: var(--bg-card);
+}
+
+@media (max-width: 768px) {
+    .top-bar,
+    .panel {
+        padding: 16px;
+    }
+
+    table {
+        min-width: 500px;
+    }
+}
+
+
+
+
